@@ -1,0 +1,18 @@
+apiVersion: v2
+name: metamind
+description: MetaMind — Adaptive Cross-Engine Query Intelligence Platform
+type: application
+version: 3.0.0
+appVersion: "3.0.0"
+keywords:
+  - query-optimization
+  - data-platform
+  - ml
+  - federation
+  - analytics
+home: https://github.com/metamind/metamind-platform
+maintainers:
+  - name: MetaMind Platform Team
+    email: platform@metamind.io
+annotations:
+  category: Data & Analytics

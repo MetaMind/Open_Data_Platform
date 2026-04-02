@@ -1,0 +1,128 @@
+replicaCount: 2
+
+image:
+  repository: metamind-platform
+  tag: "3.0.0"
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "2000m"
+    memory: "4Gi"
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+  hosts:
+    - host: metamind.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: metamind-tls
+      hosts:
+        - metamind.example.com
+
+service:
+  type: ClusterIP
+  port: 8000
+
+postgresql:
+  host: ""
+  port: 5432
+  database: metamind
+  existingSecret: metamind-db-secret
+  secretKey: database-url
+
+redis:
+  host: ""
+  port: 6379
+  existingSecret: metamind-redis-secret
+  secretKey: redis-url
+
+metamind:
+  env: production
+  logLevel: INFO
+  maxConcurrentQueries: 50
+  queueTimeoutSeconds: 300
+  planCacheTtlSeconds: 3600
+  workers: 4
+
+probes:
+  readiness:
+    path: /ready
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    failureThreshold: 3
+  liveness:
+    path: /health
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 5
+
+terminationGracePeriodSeconds: 60
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - metamind
+          topologyKey: kubernetes.io/hostname
+
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: false
+    namespace: monitoring
+    interval: 30s
+
+tmpDir: /tmp

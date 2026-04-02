@@ -1,0 +1,9 @@
+name: {{ cookiecutter.pipeline_name }}
+description: {{ cookiecutter.description }}
+schedule: "{{ cookiecutter.schedule }}"
+sources:
+  - urn: "urn:li:dataset:(dbt,{{ cookiecutter.pipeline_name }}.source,dev)"
+    name: dbt_source
+sinks:
+  - urn: "urn:li:dataset:(dbt,{{ cookiecutter.pipeline_name }}.output,dev)"
+    name: dbt_output

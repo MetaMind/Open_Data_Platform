@@ -1,0 +1,11 @@
+# MetaMind GPU Dependencies
+-r requirements.txt
+
+# RAPIDS AI - CUDA 12
+cudf-cu12>=23.10.0
+cuml-cu12>=23.10.0
+cugraph-cu12>=23.10.0
+pylibraft-cu12>=23.10.0
+
+# Additional GPU libraries
+cupy-cuda12x>=13.0.0

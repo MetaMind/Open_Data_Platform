@@ -1,0 +1,36 @@
+MetaMind {{ .Chart.AppVersion }} has been deployed!
+
+=== Access ===
+{{- if .Values.ingress.enabled }}
+  API URL: https://{{ (first .Values.ingress.hosts).host }}
+  Docs:    https://{{ (first .Values.ingress.hosts).host }}/docs
+  Metrics: https://{{ (first .Values.ingress.hosts).host }}/metrics
+{{- else }}
+  Run the following to forward the service port locally:
+    kubectl port-forward svc/{{ include "metamind.fullname" . }} 8000:8000
+
+  Then access: http://localhost:8000
+{{- end }}
+
+=== Health Checks ===
+  Readiness: GET /ready   (checks DB + Redis)
+  Liveness:  GET /health  (process alive check)
+
+=== Scaling ===
+  Current replicas: {{ .Values.replicaCount }}
+  HPA: {{ if .Values.autoscaling.enabled }}{{ .Values.autoscaling.minReplicas }}–{{ .Values.autoscaling.maxReplicas }} pods (CPU target {{ .Values.autoscaling.targetCPUUtilizationPercentage }}%){{ else }}disabled{{ end }}
+
+=== Configuration ===
+  DB secret:    {{ .Values.postgresql.existingSecret }}
+  Redis secret: {{ .Values.redis.existingSecret }}
+  Environment:  {{ .Values.metamind.env }}
+
+=== Required Secrets ===
+  Ensure these secrets exist before pods start:
+    kubectl create secret generic {{ .Values.postgresql.existingSecret }} \
+      --from-literal={{ .Values.postgresql.secretKey }}=postgresql://user:pass@host:5432/{{ .Values.postgresql.database }}
+
+    kubectl create secret generic {{ .Values.redis.existingSecret }} \
+      --from-literal={{ .Values.redis.secretKey }}=redis://host:6379/0
+
+For more info: https://github.com/metamind/metamind-platform

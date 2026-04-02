@@ -1,0 +1,246 @@
+services:
+  # MetaMind API
+  metamind:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - METAMIND_APP_ENV=development
+      - METAMIND_DEBUG=true
+      - METAMIND_DB__HOST=postgres
+      - METAMIND_DB__PORT=5432
+      - METAMIND_DB__DATABASE=metamind
+      - METAMIND_DB__USER=metamind
+      - METAMIND_DB__PASSWORD=metamind
+      - METAMIND_REDIS__HOST=redis
+      - METAMIND_REDIS__PORT=6379
+      - METAMIND_TRINO__COORDINATOR_URL=http://trino:8080
+      - METAMIND_TRINO__USER=metamind
+      - METAMIND_TRINO__CATALOG=iceberg
+      - METAMIND_S3__ENDPOINT_URL=http://minio:9000
+      - METAMIND_S3__BUCKET=metamind-data-lake
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      trino:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./metamind:/app/metamind  # Dev hot-reload
+      - ./models:/app/models
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - metamind-network
+
+  # PostgreSQL - Metadata Store
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: metamind
+      POSTGRES_PASSWORD: metamind
+      POSTGRES_DB: metamind
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U metamind"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - metamind-network
+
+  # Redis - Result Cache
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - metamind-network
+
+  # Trino - Federated Query Engine
+  trino:
+    image: trinodb/trino:426
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./trino/catalog:/etc/trino/catalog:ro
+    environment:
+      - CATALOG_MANAGEMENT=dynamic
+    depends_on:
+      - minio
+      - hive-metastore
+    networks:
+      - metamind-network
+
+  # Hive Metastore for Iceberg
+  hive-metastore:
+    image: apache/hive:4.0.0-alpha-1
+    ports:
+      - "9083:9083"
+    environment:
+      - SERVICE_NAME=metastore
+      - DB_DRIVER=postgres
+      - SERVICE_OPTS=-Djavax.jdo.option.ConnectionURL=jdbc:postgresql://postgres:5432/metastore -Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver -Djavax.jdo.option.ConnectionUserName=metamind -Djavax.jdo.option.ConnectionPassword=metamind
+    depends_on:
+      - postgres
+    networks:
+      - metamind-network
+
+  # MinIO - S3-compatible object storage
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - metamind-network
+
+  # Create MinIO bucket on startup
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 10;
+      /usr/bin/mc alias set local http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb local/metamind-data-lake || true;
+      /usr/bin/mc policy set public local/metamind-data-lake;
+      exit 0;
+      "
+    networks:
+      - metamind-network
+
+  # Kafka - CDC Event Streaming
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - metamind-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    depends_on:
+      - zookeeper
+    networks:
+      - metamind-network
+
+  # Debezium - CDC Capture
+  debezium:
+    image: debezium/connect:2.4
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: debezium-oracle
+      CONFIG_STORAGE_TOPIC: debezium_configs
+      OFFSET_STORAGE_TOPIC: debezium_offsets
+      STATUS_STORAGE_TOPIC: debezium_status
+    depends_on:
+      - kafka
+    networks:
+      - metamind-network
+
+  # Spark - CDC Processing
+  spark-master:
+    image: apache/spark:3.5.8-scala2.12-java11-python3-ubuntu
+    command:
+      - /opt/spark/bin/spark-class
+      - org.apache.spark.deploy.master.Master
+      - --host
+      - spark-master
+      - --port
+      - "7077"
+      - --webui-port
+      - "8081"
+    ports:
+      - "8081:8081"
+      - "7077:7077"
+    networks:
+      - metamind-network
+
+  spark-worker:
+    image: apache/spark:3.5.8-scala2.12-java11-python3-ubuntu
+    command:
+      - /opt/spark/bin/spark-class
+      - org.apache.spark.deploy.worker.Worker
+      - --cores
+      - "2"
+      - --memory
+      - "2G"
+      - spark://spark-master:7077
+    depends_on:
+      - spark-master
+    networks:
+      - metamind-network
+
+  # Prometheus - Metrics
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - metamind-network
+
+  # Grafana - Dashboards
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - metamind-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  metamind-network:
+    driver: bridge

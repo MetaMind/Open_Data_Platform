@@ -1,0 +1,7 @@
+{
+  "pipeline_name": "my-streaming-pipeline",
+  "description": "A real-time streaming pipeline",
+  "kafka_topic": "events",
+  "flink_parallelism": "2",
+  "author": "data-engineer"
+}

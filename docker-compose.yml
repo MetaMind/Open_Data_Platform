@@ -1,0 +1,247 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15
+    profiles: [full]
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  airflow-webserver:
+    image: apache/airflow:2.8.0
+    profiles: [full]
+    command: webserver
+    ports:
+      - "8090:8080"
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./dags:/opt/airflow/dags
+
+  airflow-scheduler:
+    image: apache/airflow:2.8.0
+    profiles: [full]
+    command: scheduler
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  datahub-gms:
+    image: linkedin/datahub-gms:v0.13.0
+    profiles: [full]
+    ports:
+      - "8080:8080"
+    environment:
+      EBEAN_DATASOURCE_HOST: postgres
+      EBEAN_DATASOURCE_USERNAME: airflow
+      EBEAN_DATASOURCE_PASSWORD: airflow
+
+  marquez:
+    image: marquezproject/marquez:0.47.0
+    profiles: [full]
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+    environment:
+      MARQUEZ_CONFIG: /usr/src/app/marquez.dev.yml
+
+  spark-master:
+    image: bitnami/spark:3.5
+    profiles: [full, spark]
+    environment:
+      SPARK_MODE: master
+      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
+      SPARK_RPC_ENCRYPTION_ENABLED: "no"
+      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: "no"
+      SPARK_SSL_ENABLED: "no"
+    ports:
+      - "8081:8080"
+      - "7077:7077"
+
+  spark-worker:
+    image: bitnami/spark:3.5
+    profiles: [full, spark]
+    environment:
+      SPARK_MODE: worker
+      SPARK_MASTER_URL: spark://spark-master:7077
+      SPARK_WORKER_MEMORY: 2G
+      SPARK_WORKER_CORES: "2"
+      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
+      SPARK_RPC_ENCRYPTION_ENABLED: "no"
+    depends_on:
+      - spark-master
+
+  minio:
+    image: minio/minio:latest
+    profiles: [full]
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+
+  # Trino profile — distributed SQL query engine
+  trino:
+    image: trinodb/trino:435
+    profiles: [full, trino]
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./trino/catalog:/etc/trino/catalog
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/info"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # Flink profile — streaming and batch SQL
+  flink-jobmanager:
+    image: flink:1.18-scala_2.12
+    profiles: [full, flink]
+    command: jobmanager
+    ports:
+      - "8083:8081"
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        rest.port: 8081
+
+  flink-taskmanager:
+    image: flink:1.18-scala_2.12
+    profiles: [full, flink]
+    command: taskmanager
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 4
+    depends_on:
+      - flink-jobmanager
+
+  flink-sql-gateway:
+    image: flink:1.18-scala_2.12
+    profiles: [full, flink]
+    command: >
+      bash -c "
+        /docker-entrypoint.sh sql-gateway.sh start-foreground
+        --configDir /opt/flink/conf
+      "
+    ports:
+      - "8084:8083"
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        sql-gateway.endpoint.rest.address: 0.0.0.0
+        sql-gateway.endpoint.rest.port: 8083
+    depends_on:
+      - flink-jobmanager
+
+  # ClickHouse profile — columnar OLAP database
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    profiles: [full, clickhouse]
+    ports:
+      - "8123:8123"   # HTTP interface
+      - "9000:9000"   # Native TCP interface
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Dagster profile — data orchestration platform
+  dagster-webserver:
+    image: ghcr.io/dagster-io/dagster:latest
+    profiles: [dagster]
+    command: dagster-webserver -h 0.0.0.0 -p 3000
+    ports:
+      - "3000:3000"
+    environment:
+      DAGSTER_HOME: /opt/dagster/dagster_home
+    volumes:
+      - dagster_home:/opt/dagster/dagster_home
+
+  dagster-daemon:
+    image: ghcr.io/dagster-io/dagster:latest
+    profiles: [dagster]
+    command: dagster-daemon run
+    environment:
+      DAGSTER_HOME: /opt/dagster/dagster_home
+    volumes:
+      - dagster_home:/opt/dagster/dagster_home
+    depends_on:
+      - dagster-webserver
+
+  # Prefect profile — workflow orchestration
+  prefect-server:
+    image: prefecthq/prefect:3-latest
+    profiles: [prefect]
+    command: prefect server start --host 0.0.0.0
+    ports:
+      - "4200:4200"
+    environment:
+      PREFECT_UI_API_URL: http://localhost:4200/api
+    volumes:
+      - prefect_data:/root/.prefect
+
+  # Temporal profile — durable workflow engine
+  temporal:
+    image: temporalio/auto-setup:1.24
+    profiles: [temporal]
+    ports:
+      - "7233:7233"
+    environment:
+      DB: sqlite
+
+  temporal-ui:
+    image: temporalio/ui:2.26
+    profiles: [temporal]
+    ports:
+      - "8233:8080"
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+    depends_on:
+      - temporal
+
+  # Minimal profile services
+  marquez-minimal:
+    image: marquezproject/marquez:0.47.0
+    profiles: [minimal]
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+    environment:
+      MARQUEZ_CONFIG: /usr/src/app/marquez.dev.yml
+
+volumes:
+  postgres_data:
+  minio_data:
+  clickhouse_data:
+  dagster_home:
+  prefect_data:

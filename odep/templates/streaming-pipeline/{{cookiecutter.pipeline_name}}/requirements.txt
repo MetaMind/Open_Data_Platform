@@ -1,0 +1,3 @@
+odep>=0.1.0
+apache-flink>=1.18
+kafka-python>=2.0

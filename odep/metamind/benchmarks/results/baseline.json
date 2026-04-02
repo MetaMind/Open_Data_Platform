@@ -1,0 +1,41 @@
+{
+  "_meta": {
+    "generated_at": "2026-03-01T00:00:00Z",
+    "version": "3.0.0",
+    "description": "Baseline performance metrics for regression detection. Fail CI if any metric regresses > 20%."
+  },
+  "optimizer": {
+    "n1_tier1_median_ms": 0.5,
+    "n2_tier1_median_ms": 0.8,
+    "n3_tier2_median_ms": 2.0,
+    "n5_tier3_median_ms": 15.0,
+    "n7_tier3_median_ms": 30.0,
+    "n10_tier3_median_ms": 45.0
+  },
+  "plan_cache": {
+    "workload_a_hit_rate": 0.85,
+    "workload_b_hit_rate": 0.45,
+    "workload_c_hit_rate": 0.01,
+    "avg_get_ms": 0.1
+  },
+  "cardinality": {
+    "histogram_mae": 0.08,
+    "learned_mae": 0.05,
+    "improvement_pct": 30.0
+  },
+  "join_enumeration": {
+    "n5_dpccp_median_ms": 2.0,
+    "n5_greedy_median_ms": 0.5,
+    "n5_cost_improvement_pct": 15.0,
+    "n10_dpccp_median_ms": 30.0,
+    "n10_greedy_median_ms": 1.0,
+    "n10_cost_improvement_pct": 25.0
+  },
+  "connectors": {
+    "duckdb_median_ms": 0.5,
+    "duckdb_p95_ms": 1.0,
+    "sqlite_pool_median_ms": 0.3,
+    "sqlite_pool_p95_ms": 0.8
+  },
+  "regression_threshold_pct": 20
+}

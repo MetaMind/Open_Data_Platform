@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "metamind.fullname" . }}-config
+  labels:
+    {{- include "metamind.labels" . | nindent 4 }}
+data:
+  METAMIND_ENV: {{ .Values.metamind.env | quote }}
+  LOG_LEVEL: {{ .Values.metamind.logLevel | quote }}
+  MAX_CONCURRENT_QUERIES: {{ .Values.metamind.maxConcurrentQueries | quote }}
+  QUEUE_TIMEOUT_SECONDS: {{ .Values.metamind.queueTimeoutSeconds | quote }}
+  PLAN_CACHE_TTL_SECONDS: {{ .Values.metamind.planCacheTtlSeconds | quote }}
+  WORKERS: {{ .Values.metamind.workers | quote }}
+  POSTGRES_HOST: {{ .Values.postgresql.host | quote }}
+  POSTGRES_PORT: {{ .Values.postgresql.port | quote }}
+  POSTGRES_DB: {{ .Values.postgresql.database | quote }}
+  REDIS_HOST: {{ .Values.redis.host | quote }}
+  REDIS_PORT: {{ .Values.redis.port | quote }}

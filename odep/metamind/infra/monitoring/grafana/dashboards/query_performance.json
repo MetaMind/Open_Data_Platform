@@ -1,0 +1,47 @@
+{
+  "description": "MetaMind — Query Latency and Throughput",
+  "editable": true,
+  "panels": [
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {"unit": "ms"}},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+      "id": 1,
+      "targets": [
+        {"expr": "histogram_quantile(0.50, rate(metamind_query_latency_ms_bucket[5m]))", "legendFormat": "p50 {{backend}}", "refId": "A"},
+        {"expr": "histogram_quantile(0.95, rate(metamind_query_latency_ms_bucket[5m]))", "legendFormat": "p95 {{backend}}", "refId": "B"},
+        {"expr": "histogram_quantile(0.99, rate(metamind_query_latency_ms_bucket[5m]))", "legendFormat": "p99 {{backend}}", "refId": "C"}
+      ],
+      "title": "Query Latency Percentiles",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {"unit": "reqps"}},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "id": 2,
+      "targets": [
+        {"expr": "sum by (backend) (rate(metamind_queries_total[1m]))", "legendFormat": "{{backend}}", "refId": "A"}
+      ],
+      "title": "Query Throughput by Backend",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "id": 3,
+      "targets": [
+        {"expr": "sum by (workload_type) (rate(metamind_queries_total[1m]))", "legendFormat": "{{workload_type}}", "refId": "A"}
+      ],
+      "title": "Query Mix by Workload Type",
+      "type": "piechart"
+    }
+  ],
+  "refresh": "15s",
+  "schemaVersion": 38,
+  "tags": ["metamind", "performance"],
+  "time": {"from": "now-30m", "to": "now"},
+  "title": "MetaMind — Query Performance",
+  "uid": "metamind-query-perf",
+  "version": 1
+}

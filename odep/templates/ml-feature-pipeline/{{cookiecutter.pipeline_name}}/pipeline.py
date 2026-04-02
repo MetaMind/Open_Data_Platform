@@ -1,0 +1,20 @@
+"""{{ cookiecutter.pipeline_name }} — ML feature engineering pipeline."""
+from odep.sdk.pipeline import Pipeline
+
+pipeline = Pipeline(
+    name="{{ cookiecutter.pipeline_name }}",
+    description="{{ cookiecutter.description }}",
+    schedule="{{ cookiecutter.schedule }}",
+    sources=[
+        {"urn": "urn:li:dataset:(duckdb,raw.user_events,dev)", "name": "user_events"}
+    ],
+    sinks=[
+        {"urn": "urn:li:dataset:({{ cookiecutter.feature_store }},features.user,dev)", "name": "user_features"}
+    ],
+    transforms=[
+        {"name": "feature_engineering", "sql": "SELECT user_id, COUNT(*) as event_count FROM user_events GROUP BY user_id"}
+    ],
+    quality_rules=[
+        {"name": "not_null_user_id", "column": "user_id", "type": "not_null", "is_blocking": True}
+    ],
+)

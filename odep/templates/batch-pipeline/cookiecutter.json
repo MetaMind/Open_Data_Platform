@@ -1,0 +1,7 @@
+{
+  "pipeline_name": "my-batch-pipeline",
+  "description": "A batch ETL pipeline",
+  "engine": "duckdb",
+  "schedule": "0 2 * * *",
+  "author": "data-engineer"
+}

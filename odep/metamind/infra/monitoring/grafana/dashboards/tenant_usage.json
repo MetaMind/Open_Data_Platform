@@ -1,0 +1,45 @@
+{
+  "description": "MetaMind — Per-Tenant Usage Breakdown",
+  "editable": true,
+  "panels": [
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {"unit": "reqps"}},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+      "id": 1,
+      "targets": [
+        {"expr": "sum by (tenant) (rate(metamind_queries_total[1m]))", "legendFormat": "{{tenant}}", "refId": "A"}
+      ],
+      "title": "Query Rate per Tenant",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {"defaults": {"unit": "ms"}},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "id": 2,
+      "targets": [
+        {"expr": "histogram_quantile(0.95, sum by (tenant, le) (rate(metamind_query_duration_ms_bucket[5m])))", "legendFormat": "{{tenant}} p95", "refId": "A"}
+      ],
+      "title": "p95 Latency per Tenant",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "id": 3,
+      "targets": [
+        {"expr": "sum by (tenant) (rate(metamind_queue_timeouts_total[5m])) * 300", "legendFormat": "{{tenant}}", "refId": "A"}
+      ],
+      "title": "Timeouts per Tenant (5m window)",
+      "type": "bargauge"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["metamind", "tenants"],
+  "time": {"from": "now-3h", "to": "now"},
+  "title": "MetaMind — Tenant Usage",
+  "uid": "metamind-tenant-usage",
+  "version": 1
+}

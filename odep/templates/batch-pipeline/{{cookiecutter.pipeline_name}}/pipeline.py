@@ -1,0 +1,17 @@
+"""{{ cookiecutter.pipeline_name }} — batch pipeline."""
+from odep.sdk.pipeline import Pipeline
+
+pipeline = Pipeline(
+    name="{{ cookiecutter.pipeline_name }}",
+    description="{{ cookiecutter.description }}",
+    schedule="{{ cookiecutter.schedule }}",
+    sources=[
+        {"urn": "urn:li:dataset:(duckdb,raw.input,dev)", "name": "raw_input"}
+    ],
+    sinks=[
+        {"urn": "urn:li:dataset:(duckdb,analytics.output,dev)", "name": "output"}
+    ],
+    transforms=[
+        {"name": "transform", "sql": "SELECT * FROM raw_input"}
+    ],
+)

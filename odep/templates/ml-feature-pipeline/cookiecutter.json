@@ -1,0 +1,7 @@
+{
+  "pipeline_name": "my-ml-feature-pipeline",
+  "description": "ML feature engineering pipeline",
+  "feature_store": "feast",
+  "schedule": "0 3 * * *",
+  "author": "ml-engineer"
+}

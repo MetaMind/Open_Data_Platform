@@ -1,0 +1,7 @@
+{
+  "pipeline_name": "my-dbt-project",
+  "description": "A dbt project with ODEP integration",
+  "dbt_profile": "default",
+  "schedule": "0 4 * * *",
+  "author": "analytics-engineer"
+}
