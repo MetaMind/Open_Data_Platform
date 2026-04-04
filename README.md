@@ -741,6 +741,16 @@ pyproject.toml           # Package metadata and dependencies
 
 <div align="center">
 
-Built with ❤️ for data engineer who want control without complexity.
+Built with ❤️ for data engineers who want control without complexity.
 
 </div>
+
+---
+
+## Author
+
+**Vikas Budde**
+
+- LinkedIn: [linkedin.com/in/vikasbudde](https://in.linkedin.com/in/vikasbudde)
+- X (Twitter): [x.com/vickcodes](https://x.com/vickcodes)
+- Email: [vikas.budde@hotmail.com](mailto:vikas.budde@hotmail.com)
